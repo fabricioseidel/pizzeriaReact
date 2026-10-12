@@ -100,6 +100,10 @@ export function createSupabaseApi(url, key) {
       return profile(id)
     },
 
+    async changePassword(password) {
+      fail((await sb.auth.updateUser({ password })).error)
+    },
+
     async getCatalog() {
       const [p, i, s] = await Promise.all([
         sb.from('products').select('*').order('sort'),

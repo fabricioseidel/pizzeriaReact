@@ -129,6 +129,15 @@ export function createLocalApi() {
       return publicUser(u)
     },
 
+    async changePassword(password) {
+      const me = await current()
+      const list = await users()
+      const u = list.find((x) => x.id === me.id)
+      u.salt = uid()
+      u.passwordHash = await hash(password, u.salt)
+      write(K.users, list)
+    },
+
     async getCatalog() {
       return catalog()
     },

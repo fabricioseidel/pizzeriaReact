@@ -106,9 +106,26 @@ create policy "perfil: ver propio o admin" on public.profiles
 drop policy if exists "perfil: editar propio" on public.profiles;
 create policy "perfil: editar propio" on public.profiles
   for update using (id = auth.uid()) with check (id = auth.uid());
--- el cliente solo puede cambiar estos campos; el rol se cambia con set_user_role()
-revoke update on public.profiles from anon, authenticated;
-grant update (name, phone, address) on public.profiles to authenticated;
+
+-- Un cliente no puede cambiarse el rol ni el correo del perfil desde la API
+create or replace function public.protect_profile() returns trigger
+language plpgsql set search_path = public as $$
+begin
+  if current_user in ('anon', 'authenticated') then
+    new.id := old.id;
+    new.email := old.email;
+    new.created_at := old.created_at;
+    if new.role is distinct from old.role and not public.is_admin() then
+      raise exception 'No autorizado para cambiar el rol';
+    end if;
+  end if;
+  return new;
+end $$;
+
+drop trigger if exists protect_profile on public.profiles;
+create trigger protect_profile
+  before update on public.profiles
+  for each row execute function public.protect_profile();
 
 drop policy if exists "settings: lectura pública" on public.settings;
 create policy "settings: lectura pública" on public.settings for select using (true);
@@ -125,15 +142,14 @@ create policy "products: lectura pública" on public.products for select using (
 drop policy if exists "products: admin" on public.products;
 create policy "products: admin" on public.products for all using (public.is_admin()) with check (public.is_admin());
 
--- Los pedidos se crean solo con place_order() (recalcula precios en el servidor)
+-- Sin política de insert/delete: los pedidos se crean solo con place_order(),
+-- que recalcula los precios en el servidor
 drop policy if exists "orders: ver propios o admin" on public.orders;
 create policy "orders: ver propios o admin" on public.orders
   for select using (user_id = auth.uid() or public.is_admin());
 drop policy if exists "orders: admin cambia estado" on public.orders;
 create policy "orders: admin cambia estado" on public.orders
   for update using (public.is_admin()) with check (public.is_admin());
-revoke insert, update, delete on public.orders from anon, authenticated;
-grant update (status) on public.orders to authenticated;
 
 -- ---------- Funciones ----------
 
@@ -240,11 +256,6 @@ begin
   returning * into o;
   return o;
 end $$;
-
-revoke execute on function public.place_order(jsonb, jsonb) from public, anon;
-grant execute on function public.place_order(jsonb, jsonb) to authenticated;
-revoke execute on function public.set_user_role(uuid, text) from public, anon;
-grant execute on function public.set_user_role(uuid, text) to authenticated;
 
 -- ---------- Datos iniciales ----------
 

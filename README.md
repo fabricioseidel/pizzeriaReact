@@ -17,27 +17,20 @@ Página web de **tupizzita.cl**, pizzería artesanal casera de masa madre. Solo 
   (recibido → en el horno → en camino → entregado), menú y precios, ingredientes,
   usuarios/roles y ajustes (abrir/cerrar local, horario, delivery, promo, datos de transferencia).
 
-## Modos de datos
+## Datos (Supabase)
 
-| Modo | Cuándo | Dónde se guardan los datos |
-|---|---|---|
-| **Demo** | sin variables de Supabase | en el navegador de cada visitante (solo para probar) |
-| **Supabase** | con `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY` | base de datos compartida: los pedidos de clientes llegan al panel admin |
+La página está conectada al proyecto Supabase **tupizzita** (`.env.production`): usuarios, menú,
+ajustes y pedidos se comparten entre todos los dispositivos, y los pedidos de los clientes llegan
+al panel de administración (se refresca cada 15 s).
 
-En modo demo el administrador es `admin@tupizzita.cl` / `admin123`.
+- Esquema, políticas de seguridad (RLS) y datos iniciales: `supabase/schema.sql`.
+- Los precios del pedido se recalculan en el servidor (`place_order`): nadie puede cambiar el total desde el navegador.
+- Un cliente no puede darse rol de admin; los roles se cambian en *Administración → Usuarios*.
+- Para registros sin correo de confirmación: Supabase → *Authentication → Sign In / Providers → Email* → desactivar **Confirm email**.
+- Para hacer admin a otra cuenta desde SQL: `update public.profiles set role = 'admin' where email = 'correo@ejemplo.cl';`
 
-### Conectar Supabase (para operar de verdad)
-
-1. Crea un proyecto en [supabase.com](https://supabase.com) y ejecuta `supabase/schema.sql` en el SQL Editor.
-2. En *Authentication → Sign In / Providers → Email* desactiva **Confirm email**
-   (o configura *URL Configuration → Site URL* con la URL del sitio).
-3. En GitHub: *Settings → Secrets and variables → Actions → Variables* crea
-   `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY` (Project Settings → API).
-4. Haz push: el workflow vuelve a publicar la página.
-5. Regístrate en la página y hazte admin en el SQL Editor:
-   `update public.profiles set role = 'admin' where email = 'tu-correo@ejemplo.cl';`
-
-Los precios del pedido se recalculan en el servidor (`place_order`), así nadie puede cambiar el total desde el navegador.
+Sin `.env.production` (o con `npm run build -- --mode demo`) la página funciona en **modo demo**:
+los datos quedan en el navegador y el admin es `admin@tupizzita.cl` / `admin123`.
 
 ## Desarrollo
 
@@ -48,5 +41,6 @@ npm run build    # genera dist/
 ```
 
 React + Vite, `HashRouter` (compatible con GitHub Pages). El workflow `.github/workflows/deploy.yml`
-publica `dist/` en la rama `gh-pages` en cada push a la rama principal.
+publica `dist/` en la rama `gh-pages` en cada push a la rama principal
+(*Settings → Pages → Deploy from a branch → `gh-pages` / root*).
 Para usar el dominio propio tupizzita.cl: *Settings → Pages → Custom domain*.

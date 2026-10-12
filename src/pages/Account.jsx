@@ -49,6 +49,7 @@ export default function Account() {
   const [orders, setOrders] = useState(null)
   const [form, setForm] = useState({ name: user.name, phone: user.phone, address: user.address })
   const [saving, setSaving] = useState(false)
+  const [pw, setPw] = useState({ a: '', b: '' })
 
   const load = useCallback(() => api.myOrders().then(setOrders).catch(() => {}), [api])
   useEffect(() => { load() }, [load])
@@ -64,6 +65,19 @@ export default function Account() {
       notify(err.message, 'error')
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function changePassword(e) {
+    e.preventDefault()
+    if (pw.a.length < 6) return notify('La contraseña debe tener al menos 6 caracteres', 'error')
+    if (pw.a !== pw.b) return notify('Las contraseñas no coinciden', 'error')
+    try {
+      await api.changePassword(pw.a)
+      setPw({ a: '', b: '' })
+      notify('Contraseña actualizada 🔒')
+    } catch (err) {
+      notify(err.message, 'error')
     }
   }
 
@@ -110,14 +124,24 @@ export default function Account() {
             </details>
           ))}
         </div>
-        <form className="card form" onSubmit={saveProfile}>
-          <h3>Mis datos</h3>
-          <label>Nombre<input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label>
-          <label>Correo<input value={user.email} disabled /></label>
-          <label>Teléfono<input required value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></label>
-          <label>Dirección<input required value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></label>
-          <button className="btn btn-red btn-block" disabled={saving}>{saving ? 'Guardando…' : 'Guardar'}</button>
-        </form>
+        <div className="side">
+          <form className="card form" onSubmit={saveProfile}>
+            <h3>Mis datos</h3>
+            <label>Nombre<input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label>
+            <label>Correo<input value={user.email} disabled /></label>
+            <label>Teléfono<input required value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></label>
+            <label>Dirección<input required value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></label>
+            <button className="btn btn-red btn-block" disabled={saving}>{saving ? 'Guardando…' : 'Guardar'}</button>
+          </form>
+          <form className="card form" onSubmit={changePassword}>
+            <h3>Cambiar contraseña</h3>
+            <div className="row2">
+              <label>Nueva contraseña<input type="password" autoComplete="new-password" required value={pw.a} onChange={(e) => setPw({ ...pw, a: e.target.value })} /></label>
+              <label>Repetir<input type="password" autoComplete="new-password" required value={pw.b} onChange={(e) => setPw({ ...pw, b: e.target.value })} /></label>
+            </div>
+            <button className="btn btn-yellow btn-block">Cambiar contraseña</button>
+          </form>
+        </div>
       </div>
     </section>
   )

@@ -892,6 +892,7 @@ section { position: relative; }
 /* Mi cuenta */
 .account { display: grid; grid-template-columns: 1.5fr 1fr; gap: 26px; align-items: start; }
 .order { margin-bottom: 18px; }
+.side { display: grid; gap: 20px; }
 .order header { display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; align-items: center; margin-bottom: 10px; }
 .order header strong { font-family: var(--display); font-weight: 400; font-size: 1.4rem; }
 .order.highlight { outline: 4px solid var(--yellow); }
