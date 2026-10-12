@@ -257,6 +257,13 @@ begin
   return o;
 end $$;
 
+-- is_admin() queda pública: la usan las políticas de lectura del menú
+revoke execute on function public.handle_new_user() from public, anon, authenticated;
+revoke execute on function public.place_order(jsonb, jsonb) from public, anon;
+revoke execute on function public.set_user_role(uuid, text) from public, anon;
+grant execute on function public.place_order(jsonb, jsonb) to authenticated;
+grant execute on function public.set_user_role(uuid, text) to authenticated;
+
 -- ---------- Datos iniciales ----------
 
 insert into public.settings (id, data) values (1, '{
