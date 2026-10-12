@@ -41,6 +41,7 @@ npm run build    # genera dist/
 ```
 
 React + Vite, `HashRouter` (compatible con GitHub Pages). El workflow `.github/workflows/deploy.yml`
-publica `dist/` en la rama `gh-pages` en cada push a la rama principal
-(*Settings → Pages → Deploy from a branch → `gh-pages` / root*).
+publica la página en cada push a la rama principal (sirve con *Settings → Pages → Source* =
+“GitHub Actions” o “Deploy from a branch → `gh-pages`”) y luego la prueba en vivo con
+`scripts/smoke.mjs` (solo lectura).
 Para usar el dominio propio tupizzita.cl: *Settings → Pages → Custom domain*.

@@ -1,21 +1,28 @@
 name: Publicar en GitHub Pages
 
-# Cada push a la rama principal compila la página y la publica en la rama gh-pages.
+# Cada push a la rama principal compila la página, la publica y la prueba en vivo.
+# Funciona con Settings → Pages → Source = "GitHub Actions" o "Deploy from a branch" (gh-pages).
 on:
   push:
   workflow_dispatch:
 
 permissions:
   contents: write
+  pages: write
+  id-token: write
 
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
-  deploy:
+  build:
     if: github.ref_name == github.event.repository.default_branch
     runs-on: ubuntu-latest
+    outputs:
+      pages_type: ${{ steps.pages.outputs.type }}
+      pages_url: ${{ steps.pages.outputs.url }}
+      bundle: ${{ steps.bundle.outputs.file }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -26,8 +33,78 @@ jobs:
       # la conexión a Supabase se lee de .env.production
       - run: npm run build
       - run: touch dist/.nojekyll
+      - id: bundle
+        run: echo "file=$(basename dist/assets/index-*.js)" >> "$GITHUB_OUTPUT"
+      # Source = "Deploy from a branch" → rama gh-pages
       - uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./dist
           publish_branch: gh-pages
+      # Source = "GitHub Actions" → artefacto para deploy-pages
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+      - id: pages
+        name: Leer configuración de GitHub Pages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if info=$(gh api "repos/$GITHUB_REPOSITORY/pages" 2>/dev/null); then
+            echo "$info" | jq '{build_type, status, html_url, source}'
+            type=$(echo "$info" | jq -r .build_type)
+            echo "type=$type" >> "$GITHUB_OUTPUT"
+            echo "url=$(echo "$info" | jq -r .html_url)" >> "$GITHUB_OUTPUT"
+            if [ "$type" = legacy ]; then
+              gh api -X POST "repos/$GITHUB_REPOSITORY/pages/builds" --jq .status || true
+            fi
+          else
+            echo "::warning::GitHub Pages no está activado (Settings → Pages)"
+            echo "type=none" >> "$GITHUB_OUTPUT"
+          fi
+
+  deploy:
+    needs: build
+    if: needs.build.outputs.pages_type == 'workflow'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
+
+  verify:
+    needs: [build, deploy]
+    if: always() && needs.build.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Esperar a que el sitio sirva esta versión
+        env:
+          URL: ${{ needs.build.outputs.pages_url }}
+          BUNDLE: ${{ needs.build.outputs.bundle }}
+        run: |
+          if [ -z "$URL" ] || [ "$URL" = null ]; then
+            echo "::error::GitHub Pages no está activado (Settings → Pages)"; exit 1
+          fi
+          for i in $(seq 1 40); do
+            if curl -fsSL "$URL?v=$i$RANDOM" | grep -q "$BUNDLE"; then echo "✅ $URL sirve $BUNDLE"; exit 0; fi
+            sleep 15
+          done
+          echo "::error::$URL no sirve la versión nueva ($BUNDLE)"
+          curl -sSL -w '\nHTTP %{http_code}\n' "$URL" | tail -20
+          exit 1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Probar el sitio en un navegador
+        run: |
+          npm i --no-save playwright@1.56.1
+          node scripts/smoke.mjs "${{ needs.build.outputs.pages_url }}"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: capturas
+          path: smoke-*.png
+          if-no-files-found: ignore
