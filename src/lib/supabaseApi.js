@@ -75,17 +75,15 @@ export function createSupabaseApi(url, key) {
     },
 
     async register({ name, email, phone, address, password }) {
-      const { data, error } = await sb.auth.signUp({
-        email: email.trim(),
-        password,
-        options: {
-          data: { name: name.trim(), phone: phone.trim(), address: address.trim() },
-          emailRedirectTo: window.location.href.split('#')[0],
-        },
+      // la cuenta se crea ya confirmada (función "register"), sin correo de verificación
+      const res = await fetch(`${url}/functions/v1/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', apikey: key, Authorization: `Bearer ${key}` },
+        body: JSON.stringify({ name, email, phone, address, password }),
       })
-      fail(error)
-      if (!data.session) return { user: null, needsConfirmation: true }
-      return { user: await profile(data.user.id) }
+      const out = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(out.error || 'No se pudo crear la cuenta')
+      return { user: await this.login(email, password) }
     },
 
     async logout() {
