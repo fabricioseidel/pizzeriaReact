@@ -50,13 +50,19 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if info=$(gh api "repos/$GITHUB_REPOSITORY/pages" 2>/dev/null); then
+          api="repos/$GITHUB_REPOSITORY/pages"
+          if ! info=$(gh api "$api" 2>err.txt); then
+            echo "GET /pages: $(cat err.txt)"
+            echo "Pages no está activado; intento activarlo con Source = GitHub Actions"
+            info=$(gh api -X POST "$api" -f build_type=workflow 2>err.txt) || echo "POST /pages: $(cat err.txt) $info"
+          fi
+          if echo "$info" | jq -e .html_url >/dev/null 2>&1; then
             echo "$info" | jq '{build_type, status, html_url, source}'
             type=$(echo "$info" | jq -r .build_type)
             echo "type=$type" >> "$GITHUB_OUTPUT"
             echo "url=$(echo "$info" | jq -r .html_url)" >> "$GITHUB_OUTPUT"
             if [ "$type" = legacy ]; then
-              gh api -X POST "repos/$GITHUB_REPOSITORY/pages/builds" --jq .status || true
+              gh api -X POST "$api/builds" --jq .status || true
             fi
           else
             echo "::warning::GitHub Pages no está activado (Settings → Pages)"
